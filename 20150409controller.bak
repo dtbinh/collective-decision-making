@@ -1,0 +1,273 @@
+-- Color Initialization
+GREEN = {["red"] = 0, ["green"] = 255, ["blue"] = 0}			-- food
+MAGENTA = {["red"] = 255, ["green"] = 0, ["blue"] = 255}	-- room 0
+BLUE = {["red"] = 0, ["green"] = 0, ["blue"] = 255}			-- room 1
+ORANGE = {["red"] = 255, ["green"] = 140, ["blue"] = 0}		-- room 2
+RED = {["red"] = 255, ["green"] = 0, ["blue"] = 0}			-- room 3
+
+-- Rooms array
+rooms = {"MAGENTA", "BLUE", "ORANGE", "RED"}
+
+-- Robot position
+NEST = -1
+SITE_0 = 0
+SITE_1 = 1
+SITE_2 = 2
+SITE_3 = 3
+FOOD = 4
+
+-- Put your global variables here
+INIT = "INIT"
+AVOID = "AVOID"
+SURVEY = "SURVEY"
+WAGGLE = "WAGGLE"
+
+opinion = nil
+
+current_state = INIT
+resume_state = INIT
+
+is_obstacle_sensed = false
+is_room_sensed = false
+room_angle = nil
+room_distance = nil
+current_turn_steps = 0
+MAX_TURN_STEPS = 20
+
+SPEED = 5
+
+-- function used to copy two tables
+function table.copy(t)
+  local t2 = {}
+  for k,v in pairs(t) do
+    t2[k] = v
+  end
+  return t2
+end
+
+--[[ This function is executed every time you press the 'execute'
+     button ]]
+function init()
+   -- put your code here
+	current_state = INIT
+	resume_state = INIT
+	robot.colored_blob_omnidirectional_camera.enable()
+end
+
+
+
+--[[ This function is executed at each time step
+     It must contain the logic of your controller ]]
+function step()
+   -- put your code here
+	detectCollision() -- If collision detected, current state is set to AVOID
+
+	if current_state == INIT then
+		robot.wheels.set_velocity(SPEED, SPEED)
+		if is_obstacle_sensed then
+			setDataCollisionAvoid(INIT)
+		else
+			randomOpinion()
+			log(robot.id..": opinion: "..rooms[opinion+1])
+			if opinion ~= nil then
+				current_state = SURVEY
+			end
+		end
+	elseif current_state == SURVEY then
+		processRoomSense()
+		if is_obstacle_sensed then
+			setDataCollisionAvoid(SURVEY)
+		elseif is_room_sensed then
+			log(robot.id..": opinion:"..rooms[opinion+1]..",angle:"..room_angle..",distance:"..room_distance)
+			headToLED()
+		else
+			robot.wheels.set_velocity(SPEED, SPEED)
+		end
+	elseif current_state == AVOID then
+		avoidCollision()
+	end
+end
+
+
+
+--[[ This function is executed every time you press the 'reset'
+     button in the GUI. It is supposed to restore the state
+     of the controller to whatever it was right after init() was
+     called. The state of sensors and actuators is reset
+     automatically by ARGoS. ]]
+function reset()
+   -- put your code here
+	current_state = INIT
+	resume_stete = INIT
+	is_obstacle_sensed = false
+	current_turn_steps = 0
+end
+
+
+
+--[[ This function is executed only once, when the robot is removed
+     from the simulation ]]
+function destroy()
+   -- put your code here
+end
+
+-- Sense obstacles by sorting the proximity sensor values and checking the biggest.
+-- If it is bigger than a threshold, then there is an obstacle.
+-- We ignore sensors on the back of the robot (abs(angle) < pi/2)
+function detectCollision()
+   is_obstacle_sensed = false
+   sort_prox = table.copy(robot.proximity)
+   table.sort(sort_prox, function(a,b) return a.value > b.value end)
+   if sort_prox[1].value > 0.05 and math.abs(sort_prox[1].angle) < math.pi/2
+      then is_obstacle_sensed = true
+   end
+end
+
+function setDataCollisionAvoid(state)
+	resume_state = state
+	current_state = AVOID
+	current_turn_steps = math.random(MAX_TURN_STEPS)
+end
+
+function avoidCollision()
+	robot.wheels.set_velocity(-SPEED,SPEED)
+	current_turn_steps = current_turn_steps - 1
+	if current_turn_steps <= 0 then
+		current_state = resume_state
+	end
+end
+
+function randomOpinion()
+	objects = table.copy(robot.colored_blob_omnidirectional_camera)
+	if next(objects) ~= nil then
+		leds, food = sepLedsAndFood(objects)
+	end
+	if next(leds) ~= nil then
+		opinion = leds[math.random(#leds)].object_type
+	end
+end
+
+function sepLedsAndFood()
+	objects = table.copy(robot.colored_blob_omnidirectional_camera)
+	leds = {}
+	food = {}
+	led_count = 0
+	food_count = 0
+	for i = 1, #objects do
+		object_type = objectType(objects[i])
+		if object_type == FOOD then
+			food_count = food_count + 1
+			tmp = {}
+			tmp["object_type"] = object_type
+			tmp["distance"] = objects[i].distance
+			tmp["angle"] = objects[i].angle
+			food[food_count] = tmp
+		elseif object_type >= SITE_0 and object_type <= SITE_3 then
+			led_count = led_count + 1
+			tmp = {}
+			tmp["object_type"] = object_type
+			tmp["distance"] = objects[i].distance
+			tmp["angle"] = objects[i].angle
+			leds[led_count] = tmp
+		end
+	end
+
+	return leds, food
+end
+
+
+function changeDirectionToOpinion()	
+	if next(objects) ~= nil then
+		leds, food = sepLedsAndFood()
+	end
+	if next(leds) ~= nil then
+		for i = 1, #leds do
+			if leds[i].obj_type == opinion then
+				if abs(leds[i].angle) > 0.087 and leds[i].angle > 0 then
+					ROTATE_SPEED = leds[i].angle * robot.wheels.axis_length
+					robot.wheels.set_velocity(-ROTATE_SPEED / 2, ROTATE_SPEED / 2)
+				elseif abs(leds[i].angle) > 0.087 and leds[i].angle < 0 then
+					ROTATE_SPEED = abs(leds[i].angle) * robot.wheels.axis_length
+					robot.wheels.set_velocity(ROTATE_SPEED / 2, -ROTATE_SPEED / 2)
+				elseif leds[i].distance <= 0.05 and abs(leds[i].angle) <= 0.087  then
+					robot.wheels.set_velocity(0, 0)
+				else
+					robot.wheels.set_velocity(SPEED, SPEED)
+				end
+			end
+		end
+	end
+end
+			
+
+--[[***function objectType(object)***
+	Finds the object and returns an integer value representing the object type
+	params:	object with red, green, and blue values
+	return:	0 - room 0 (magenta)
+				1 - room 1 (blue)
+				2 - room 2 (orange)
+				3 - room 3 (red)
+				4 - food (green)
+				nil - unknown object	]]
+function objectType(object)
+	-- Food (green)
+	if (	object.color.red == GREEN.red and 
+			object.color.green == GREEN.green and 
+			object.color.blue == GREEN.blue ) then
+		return FOOD
+	-- Room 0 (magenta)
+	elseif ( object.color.red == MAGENTA.red and 
+				object.color.green == MAGENTA.green and 
+				object.color.blue == MAGENTA.blue ) then
+		return SITE_0
+	-- Room 1 (blue)split code in multiple lines
+	elseif ( object.color.red == BLUE.red and 
+				object.color.green == BLUE.green and 
+				object.color.blue == BLUE.blue ) then
+		return SITE_1
+	-- Room 2 (orange)
+	elseif ( object.color.red == ORANGE.red and 
+				object.color.green == ORANGE.green and 
+				object.color.blue == ORANGE.blue ) then
+		return SITE_2
+	-- Room 3 (red)
+	elseif ( object.color.red == RED.red and 
+				object.color.green == RED.green and 
+				object.color.blue == RED.blue ) then
+		return SITE_3
+	else
+		return false
+	end
+end
+
+function processRoomSense()
+	leds, food = sepLedsAndFood()
+	is_room_sensed = false
+	room_angle = nil
+	room_distance = nil
+	if next(leds) ~= nil then
+		for i = 1, #leds do
+			if leds[i].object_type == opinion then
+				is_room_sensed = true
+				room_angle = leds[i].angle
+				room_distance = leds[i].distance
+			end
+		end
+	end
+end
+
+function headToLED()
+	if math.abs(room_angle) > 0.0872 then
+		if room_angle > 0 then --positive
+			robot.wheels.set_velocity(SPEED, SPEED + (room_angle * robot.wheels.axis_length * SPEED))
+		else
+			robot.wheels.set_velocity(SPEED + (room_angle * robot.wheels.axis_length * SPEED), SPEED)
+		end
+	else
+		if room_distance <= 10 then
+			robot.wheels.set_velocity(0, 0)
+		else
+			robot.wheels.set_velocity(SPEED, SPEED)
+		end
+	end
+end

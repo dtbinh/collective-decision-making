@@ -1,0 +1,192 @@
+-- Color Initialization
+GREEN = {["red"] = 0, ["green"] = 255, ["blue"] = 0}			-- food
+MAGENTA = {["red"] = 255, ["green"] = 0, ["blue"] = 255}	-- room 0
+BLUE = {["red"] = 0, ["green"] = 0, ["blue"] = 255}			-- room 1
+ORANGE = {["red"] = 255, ["green"] = 140, ["blue"] = 0}		-- room 2
+RED = {["red"] = 255, ["green"] = 0, ["blue"] = 0}			-- room 3
+
+-- Robot position
+NEST = -1
+SITE_0 = 0
+SITE_1 = 1
+SITE_2 = 2
+SITE_3 = 3
+FOOD = 4
+
+-- States
+INIT = "INIT"
+WAGGLE_DANCE = "WAGGLE_DANCE"
+SURVEY = "SURVEY"
+
+-- global variables
+current_position = NEST
+
+-- The base wheel speed
+SPEED = 5
+
+
+-- copy two tables
+function table.copy(t)
+	local t2 = {}
+	for k, v in pairs(t) do
+		t2[k] = v
+	end
+	return t2
+end
+
+
+
+--[[ This function is executed every time you press the 'execute'
+     button ]]
+function init()
+   -- put your code here
+	-- Set visualization for robot types (red for G type, blue for L type)
+	--[[ if(robot.motor_ground) then -- if type G robot
+		robot.leds.set_all_colors("red") -- set visualization to red
+	end
+	if(robot.light) then -- if type L robot
+		robot.leds.set_all_colors("blue") -- set visualization to blue
+	end ]]--
+
+	robot.colored_blob_omnidirectional_camera.enable()
+end
+
+
+--[[ This function is executed at each time step
+     It must contain the logic of your controller ]]
+function step()
+   -- put your code here
+	collisionDetection()
+	updateCurrentPosition()
+	log(robot.id..": pos: "..current_position)
+	-- Type G robot
+	if robot.motor_ground then
+		-- Get highest motor ground value
+		sort_ground = table.copy(robot.motor_ground)
+		table.sort(sort_ground, function(a,b) return a.value > b.value end)
+	end
+
+	-- Type L robot
+	if robot.light then
+		-- Get highest light sensor value
+		sort_light = table.copy(robot.light)
+		table.sort(sort_light, function(a,b) return a.value > b.value end)
+	end
+end
+
+
+
+--[[ This function is executed every time you press the 'reset'
+     button in the GUI. It is supposed to restore the state
+     of the controller to whatever it was right after init() was
+     called. The state of sensors and actuators is reset
+     automatically by ARGoS. ]]
+function reset()
+   -- put your code here
+end
+
+
+
+--[[ This function is executed only once, when the robot is removed
+     from the simulation ]]
+function destroy()
+   -- put your code here
+end
+
+
+
+-- Collision detection using proximity sensor
+function collisionDetection()
+	-- Initialization: index and value for proximity sensors with highest value
+	value = -1	-- highest value found so far
+	index = -1	-- index of the highest value
+
+	-- Update value and index by checking each proximity sensor (1 to 24).
+	for i = 1, 24 do	-- By the end of this loop value contains the highest value of sensor and index contains it's index.
+		-- Update value and index when ever the previous value is lower than the current proximity sensor value
+		if value < robot.proximity[i].value then 
+			value = robot.proximity[i].value
+			index = i
+		end
+	end
+
+	-- Take action based on the highest proximity sensor value found
+	if value == 0 then	-- No obstacle
+		robot.wheels.set_velocity(SPEED, SPEED)	-- Go straight (Same speed to both the wheels)
+	else	-- If obstacle found
+		if index <= 12 then	-- obstacle on the left side
+			robot.wheels.set_velocity(SPEED, (index - 1) * SPEED / 11)	-- Steer right by decreasing the right wheel speed
+		else -- obstacle on the right side
+			robot.wheels.set_velocity((24 - index) * SPEED / 11, SPEED) -- Steer left by decreasing the left wheel speed
+		end
+	end
+end
+
+
+--[[***function objectType(object)***
+	Finds the object and returns an integer value representing the object type
+	params:	object with red, green, and blue values
+	return:	0 - room 0 (magenta)
+				1 - room 1 (blue)
+				2 - room 2 (orange)
+				3 - room 3 (red)
+				4 - food (green)
+				nil - unknown object	]]
+function objectType(object)
+	-- Food (green)
+	if (	object.color.red == GREEN.red and 
+			object.color.green == GREEN.green and 
+			object.color.blue == GREEN.blue ) then
+		return FOOD
+	-- Room 0 (magenta)
+	elseif ( object.color.red == MAGENTA.red and 
+				object.color.green == MAGENTA.green and 
+				object.color.blue == MAGENTA.blue ) then
+		return SITE_0
+	-- Room 1 (blue)split code in multiple lines
+	elseif ( object.color.red == BLUE.red and 
+				object.color.green == BLUE.green and 
+				object.color.blue == BLUE.blue ) then
+		return SITE_1
+	-- Room 2 (orange)
+	elseif ( object.color.red == ORANGE.red and 
+				object.color.green == ORANGE.green and 
+				object.color.blue == ORANGE.blue ) then
+		return SITE_2
+	-- Room 3 (red)
+	elseif ( object.color.red == RED.red and 
+				object.color.green == RED.green and 
+				object.color.blue == RED.blue ) then
+		return SITE_3
+	else
+		return false
+	end
+end
+
+
+function currentSite(objects)
+	for i = 1, #objects do
+		object_type = objectType(objects[i])
+		if object_type and object_type ~= FOOD then
+			return object_type
+		end
+	end
+	return false
+end
+
+--[[**function updateCurrentPosition()
+	]]
+function updateCurrentPosition()
+	objects = table.copy(robot.colored_blob_omnidirectional_camera)
+	if next(objects) ~= nil then
+		table.sort(objects, function(a,b) return a.distance < b.distance end)
+		if objectType(objects[1]) == FOOD then
+			tmp_curr_pos = currentSite(objects)
+			if tmp_curr_pos then
+				current_position = tmp_curr_pos
+			end
+		else
+			current_position = NEST
+		end
+	end
+end

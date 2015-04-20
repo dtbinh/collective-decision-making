@@ -1,0 +1,230 @@
+<?xml version="1.0" ?>
+<argos-configuration>
+
+  <!-- ************************* -->
+  <!-- * General configuration * -->
+  <!-- ************************* -->
+  <framework>
+    <!-- To make ARGoS faster, you can set 'threads' to some number greater than 0 -->
+    <system threads="0" />
+    <!-- To change the random seed for each experiment repetition, you can set 'random_seed' to whatever value you like -->
+    <experiment length="0" ticks_per_second="10" random_seed="0" />
+  </framework>
+
+  <!-- ****************** -->
+  <!-- * Loop functions * -->
+  <!-- ****************** -->
+   <loop_functions label="decision_making" output="output.txt" />
+
+  <!-- *************** -->
+  <!-- * Controllers * -->
+  <!-- *************** -->
+  <controllers>
+    <!-- You can tweak some parameters of the sensors and actuators.
+         For instance, you can set 'show_rays' to "true" to some of the sensors
+         to see the rays cast by the device, thus making debugging easier.
+         By default, rays are never shown. Dealing with rays makes ARGoS a
+         little slower, so, if you don't need the rays, switch them off.
+         For more information, type:
+         $ argos -h
+    -->
+    <lua_controller id="controllerG">
+      <actuators>
+        <differential_steering implementation="default" />
+        <footbot_gripper implementation="default" />
+        <footbot_turret implementation="default" />
+        <leds implementation="default" medium="leds" />
+        <range_and_bearing implementation="default" />
+      </actuators>
+      <sensors>
+        <colored_blob_omnidirectional_camera implementation="rot_z_only" medium="leds" show_rays="true" />
+        <differential_steering implementation="default" />
+        <footbot_motor_ground implementation="rot_z_only" />
+        <footbot_proximity implementation="default" show_rays="false" />
+        <footbot_turret_encoder implementation="default" />
+        <range_and_bearing implementation="medium" medium="rab" show_rays="false" />
+      </sensors>
+      <!-- If you want to execute ARGoS with an empty script, use this syntax -->
+      <!-- <params /> -->
+      <!-- If you want to execute ARGoS with a script preloaded, use this syntax
+           Note: the preloaded script does not appear in the Lua editor! (that's a TODO) -->
+      <params script="controller.lua" />
+    </lua_controller>
+    <lua_controller id="controllerL">
+      <actuators>
+        <differential_steering implementation="default" />
+        <footbot_gripper implementation="default" />
+        <footbot_turret implementation="default" />
+        <leds implementation="default" medium="leds" />
+        <range_and_bearing implementation="default" />
+      </actuators>
+      <sensors>
+        <colored_blob_omnidirectional_camera implementation="rot_z_only" medium="leds" show_rays="true" />
+        <differential_steering implementation="default" />
+        <footbot_light implementation="rot_z_only" show_rays="false" />
+        <footbot_proximity implementation="default" show_rays="false" />
+        <footbot_turret_encoder implementation="default" />
+        <range_and_bearing implementation="medium" medium="rab" show_rays="false" />
+      </sensors>
+      <!-- If you want to execute ARGoS with an empty script, use this syntax -->
+      <!-- <params /> -->
+      <!-- If you want to execute ARGoS with a script preloaded, use this syntax
+           Note: the preloaded script does not appear in the Lua editor! (that's a TODO) -->
+      <params script="controller.lua" />
+    </lua_controller>
+  </controllers>
+
+  <!-- *********************** -->
+  <!-- * Arena configuration * -->
+  <!-- *********************** -->
+  <!-- Note: rotations are specified and performed in ZYX order -->
+  <arena size="9, 9, 10" center="0, 0, 0">
+
+    <!-- Floor -->
+    <floor id="floor" source="loop_functions" pixels_per_meter="100" />
+
+    <!-- Walls -->
+    <!-- Central room -->
+    <box id="wall_north_c1" size="0.1,1.2,1" movable="false">
+      <body position="1.55,0.9,0" orientation="0,0,0" />
+      <leds medium="leds">
+           <led position="0.0,-0.9,0.3" color="blue" />
+      </leds>
+    </box>
+    <box id="wall_north_c2" size="0.1,1.2,1" movable="false">
+      <body position="1.55,-0.90,0" orientation="0,0,0" />
+    </box>
+
+    <box id="wall_south_c1" size="0.1,1.2,1" movable="false">
+      <body position="-1.55,0.9,0" orientation="0,0,0" />
+      <leds medium="leds">
+           <led position="0.0,-0.9,0.3" color="red" />
+      </leds>
+    </box>
+
+    <box id="wall_south_c2" size="0.1,1.2,1" movable="false">
+      <body position="-1.55,-0.9,0" orientation="0,0,0" />
+    </box>
+
+    <box id="wall_west_c1" size="1.2,0.1,1" movable="false">
+      <body position="0.90,1.55,0" orientation="0,0,0" />
+      <leds medium="leds">
+           <led position="-0.9,0.0,0.3" color="magenta" />
+      </leds>
+    </box>
+    <box id="wall_west_c2" size="1.2,0.1,1" movable="false">
+      <body position="-0.9,1.55,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_east_c1" size="1.2,0.1,1" movable="false">
+      <body position="0.9,-1.55,0" orientation="0,0,0" />
+      <leds medium="leds">
+           <led position="-0.9,0.0,0.3" color="orange" />
+      </leds>
+    </box>
+    <box id="wall_east_c2" size="1.2,0.1,1" movable="false">
+      <body position="-0.9,-1.55,0" orientation="0,0,0" />
+    </box>
+
+    <!-- Room 0 -->
+    <box id="wall_north_1" size="0.1,3,1" movable="false">
+      <body position="1.55,3,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_south_1" size="0.1,3,1" movable="false">
+      <body position="-1.55,3,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_west_1" size="3,0.1,1" movable="false">
+      <body position="0,4.55,0" orientation="0,0,0" />
+    </box>
+
+    <!-- Room 1 -->
+    <box id="wall_north_2" size="0.1,3,1" movable="false">
+      <body position="4.55,0,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_west_2" size="3,0.1,1" movable="false">
+      <body position="3,1.55,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_east_2" size="3,0.1,1" movable="false">
+      <body position="3,-1.55,0" orientation="0,0,0" />
+    </box>
+
+    <!-- Room 2 -->
+    <box id="wall_north_3" size="0.1,3,1" movable="false">
+      <body position="1.55,-3,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_south_3" size="0.1,3,1" movable="false">
+      <body position="-1.55,-3,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_east_3" size="3,0.1,1" movable="false">
+      <body position="0,-4.55,0" orientation="0,0,0" />
+    </box>
+
+    <!-- Room 3 -->
+    <box id="wall_south_4" size="0.1,3,1" movable="false">
+      <body position="-4.55,0,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_west_4" size="3,0.1,1" movable="false">
+      <body position="-3,1.55,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_east_4" size="3,0.1,1" movable="false">
+      <body position="-3,-1.55,0" orientation="0,0,0" />
+    </box>
+
+    <!-- Foot-bots -->
+
+    <!-- Foot-bots G -->
+    <distribute>
+      <position method="uniform" min="-1.5,-1.5,0" max="1.5,1.5,0" />
+      <orientation method="uniform" min="0,0,0" max="360,0,0" />
+      <!-- You can play with the number of foot-bots changing the 'quantity' attribute -->
+      <entity quantity="10" max_trials="10" base_num="1">
+        <!-- You can play with the range of the range and bearing system changing the 'rab_range' attribute
+             NOTE: here it is expressed in meters, while in the controller you'll work in cm! -->
+        <foot-bot id="fbG" rab_range="1.5" omnidirectional_camera_aperture="85.2">
+          <controller config="controllerG" /> 
+        </foot-bot>
+      </entity>
+    </distribute>
+
+    <!-- Foot-bots L -->
+    <distribute>
+      <position method="uniform" min="-1.5,-1.5,0" max="1.5,1.5,0" />
+      <orientation method="uniform" min="0,0,0" max="360,0,0" />
+      <!-- You can play with the number of foot-bots changing the 'quantity' attribute -->
+      <entity quantity="10" max_trials="10" base_num="1">
+        <!-- You can play with the range of the range and bearing system changing the 'rab_range' attribute
+             NOTE: here it is expressed in meters, while in the controller you'll work in cm! -->
+        <foot-bot id="fbL" rab_range="1.5" omnidirectional_camera_aperture="85.2">
+          <controller config="controllerL" /> 
+        </foot-bot>
+      </entity>
+    </distribute>
+  </arena>
+
+  <!-- ******************* -->
+  <!-- * Physics engines * -->
+  <!-- ******************* -->
+  <physics_engines>
+    <dynamics2d id="dyn2d" iterations="50" />
+  </physics_engines>
+
+  <!-- ********* -->
+  <!-- * Media * -->
+  <!-- ********* -->
+  <media>
+    <range_and_bearing id="rab" />
+    <led id="leds" />
+  </media>
+
+  <!-- ****************** -->
+  <!-- * Visualization * -->
+  <!-- ****************** -->
+  <visualization>
+    <!-- To execute ARGoS in batch without visualization, just comment out the 'qt-opengl' section -->
+    <qt-opengl lua_editor="true">
+      <camera>
+        <placement idx="0" position="0.0,0.0,5.0" look_at="0,0,0" lens_focal_length="20" />
+      </camera>
+    </qt-opengl>
+  </visualization>
+
+</argos-configuration>
