@@ -50,14 +50,14 @@ v	= 0	-- average of metrics
 SPEED = 20 -- base speeed
 
 -- Application specific parameters
-LAM = -2
-SCALE = 40
+LAM = -2		-- lambda (rate) value for probability exponential distribution
+SCALE = 40	-- weight for probability exponential distribution
 
 -- Walk time parameters
-max_walk_steps = nil
-MAX_RAND_WALK_STEPS = 30
-rand_walk_steps = nil
-BASE_PROBABILITY = 0.2
+max_walk_steps = nil		-- The total number of steps robot can take when entered into desired state
+MAX_RAND_WALK_STEPS = 30	-- Maximum number of steps before changing the direction
+rand_walk_steps = nil		-- Random number of steps before changing the direction
+BASE_PROBABILITY = 0.2	-- Base probability to change the opinion
 
 
 --[[***function avoidCollision()***
@@ -130,100 +130,85 @@ function detectCollision()
 end
 
 
---
+--[[***function eqOpinion()***
+Equally distribute an opinion of available rooms.
+Update global parameter opinion on selection.
+]]
+function eqOpinion()
+	local id = string.sub(robot.id, 4)
+	if robot.motor_ground then
+		opinion = math.fmod(id - 1, 4)
+	end
+
+	if robot.light then
+		opinion = 3 - math.fmod(id - 1, 4)
+	end
+end
+
+
+--[[***function executeAndFlipState()***
+Execute the current state and flip when timeout. 
+]]
 function executeAndFlipState(curr_state)
-	if curr_state == SURVEY then
-		if max_walk_steps == nil then
-			max_walk_steps = math.ceil(robot.random.uniform_int(150, 300))
+	if curr_state == SURVEY then	-- SURVEY state
+		if max_walk_steps == nil then	-- if no max walk steps
+			max_walk_steps = robot.random.uniform_int(150, 300)	-- update max walk steps
 		
-		elseif max_walk_steps <= 0 then
-			max_walk_steps = nil
+		elseif max_walk_steps <= 0 then -- walked max steps
+			max_walk_steps = nil	-- reset max walk steps
 
-			is_room_sensed = false
-			is_at_entrance = false
-			is_entered_room = false
+			is_room_sensed = false	--reset is_room_sensed flag
+			is_at_entrance = false	-- reset is_at_entrance flag
+			is_entered_room = false	-- reset is_entered_room flag
 
-			current_state = WAGGLE
-			resume_state = WAGGLE
+			current_state = WAGGLE	-- switch state to WAGGLE
+			resume_state = WAGGLE		-- set resume_state to WAGGLE to recover when collision detected
 		
-		elseif max_walk_steps > 0 then
-			max_walk_steps = max_walk_steps - 1
-			updateMetrics()
+		elseif max_walk_steps > 0 then	-- if not reached max walk steps
+			max_walk_steps = max_walk_steps - 1	-- decrement max walk steps
+			updateMetrics()	-- update metrics
 		end
 	
-	elseif curr_state == WAGGLE then
-		if max_walk_steps == nil then
-			max_walk_steps = math.ceil(SCALE * LAM * (1 - math.exp(- LAM * v)))
-			log("W:"..robot.id..": o:"..rooms[opinion+1]..", v:"..v.."mws:"..max_walk_steps)		
+	elseif curr_state == WAGGLE then	-- WAGGLE state
+		if max_walk_steps == nil then	-- if no max walk steps
+			max_walk_steps = math.ceil(SCALE * LAM * (1 - math.exp(- LAM * v)))	-- update max walk steps
+			log("W:"..robot.id..": o:"..rooms[opinion+1]..", v:"..v.."mws:"..max_walk_steps)
 
-		elseif max_walk_steps <= 0 then
-			max_walk_steps = nil
-			local neighbors_opinion = {}
-			for i = 1, #robot.range_and_bearing do -- for each robot seen
+		elseif max_walk_steps <= 0 then	-- walked max steps
+			max_walk_steps = nil	-- reset max walk steps
+			local neighbors_opinion = {}	-- empty table to read neighbors opinion
+			for i = 1, #robot.range_and_bearing do -- for each robot sense
 				if robot.range_and_bearing[i].range < 215 then -- see if they are close enough. What happens if we don't put a distance cutoff here?
-					table.insert(neighbors_opinion, robot.range_and_bearing[i].data[1])
+					table.insert(neighbors_opinion, robot.range_and_bearing[i].data[1]) -- insert opinion into table
 				end
 			end
 
-			if robot.random.uniform() > BASE_PROBABILITY then
-				if neighbors_opinion ~= nil then
-					opinion = neighbors_opinion[robot.random.uniform_int(1, #neighbors_opinion + 1)]
+			if robot.random.uniform() > BASE_PROBABILITY then	-- probability to change the opinion
+				if neighbors_opinion ~= nil then	-- neighbors not empty
+					opinion = neighbors_opinion[robot.random.uniform_int(1, #neighbors_opinion + 1)]	-- adopt opinion
 				end
 			end
 
-			is_room_sensed = false
-			is_at_entrance = false
-			is_entered_room = false
+			is_room_sensed = false	--reset is_room_sensed flag
+			is_at_entrance = false	-- reset is_at_entrance flag
+			is_entered_room = false	-- reset is_entered_room flag
 
-			current_state = SURVEY
-			resume_state = SURVEY
+			current_state = SURVEY	-- switch state to SURVEY
+			resume_state = SURVEY		-- set resume_state to SURVEY to recover when collision detected
 
-		elseif max_walk_steps > 0 then
-			max_walk_steps = max_walk_steps - 1
+		elseif max_walk_steps > 0 then	-- if not reached max walk steps
+			max_walk_steps = max_walk_steps - 1	-- decrement max walk steps
 		end
 	end 
 end
 
 
---[[***function getIntoRoom()***
+--[[***function getIntoNest()***
+Get into the nest by moving away from the LED of opinion towards any other LED
 ]]
-function getIntoRoom()
-	local rotation_speed = 0	
-	is_room_sensed = false
-
-	leds, food = sepLedsAndFood(objects)	-- separate LEDs(at the entrance), and food (green LEDs)
-	
-	if next(food) ~= nil then	-- food not empty
-		table.sort(food, function(a,b) return a.distance < b.distance end) -- sort food in increasing order
-		if math.abs(food[1].angle) > 0.0872 then	-- food angle out of threshold
-			if food[1].angle > 0 then --positive angle (food on left)
-				rotation_speed = (food[1].angle * robot.wheels.axis_length) / 2.0	-- calculate rotatoon speed
-				robot.wheels.set_velocity(-rotation_speed, rotation_speed)	-- left rotation (half on left and the remaining half on the right wheel in opposite directions)
-			else	-- negative angle (food on right)
-				rotation_speed = (math.abs(food[1].angle) * robot.wheels.axis_length) / 2.0	-- calculate rotatoon speed
-				robot.wheels.set_velocity(rotation_speed, -rotation_speed)	-- right rotation (half on left and the remaining half on the right wheel in opposite directions)
-			end
-		else	-- food angle within threshold
-			if food[1].distance <= 40 then -- food d	istance within threshold
-				is_room_sensed = false
-				is_at_entrance = false -- reset falg is_robot_at_entrance 
-				is_entered_room = true	-- the robot has moved to the desired room (site)
-				current_position = opinion -- set current position to the entered room
-				robot.wheels.set_velocity(SPEED, SPEED)	-- go straight
-			else	-- food d	istance not in threshold
-				robot.wheels.set_velocity(SPEED, SPEED)	-- go straight
-			end
-		end
-	else
-		robot.wheels.set_velocity(SPEED, SPEED)	-- go straight
-	end
-end
-
-
---
 function getIntoNest()
-	local rotation_speed = 0	
-	is_room_sensed = false
+	local rotation_speed = 0	-- wheels rotation speed
+	is_room_sensed = false	-- reset is_room_sensed flag
 
 	leds, food = sepLedsAndFood(objects)	-- separate LEDs(at the entrance), and food (green LEDs)
 	
@@ -249,6 +234,42 @@ function getIntoNest()
 				is_at_entrance = false -- reset falg is_robot_at_entrance 
 				is_entered_room = true	-- the robot has moved to the desired room (site)
 				current_position = NEST -- set current position to the entered nest
+				robot.wheels.set_velocity(SPEED, SPEED)	-- go straight
+			else	-- food d	istance not in threshold
+				robot.wheels.set_velocity(SPEED, SPEED)	-- go straight
+			end
+		end
+	else
+		robot.wheels.set_velocity(SPEED, SPEED)	-- go straight
+	end
+end
+
+
+--[[***function getIntoRoom()***
+Get into the room by moving close to a food source (green LED)
+]]
+function getIntoRoom()
+	local rotation_speed = 0	-- wheels rotation speed
+	is_room_sensed = false	-- reset is_room_sensed flag
+
+	leds, food = sepLedsAndFood(objects)	-- separate LEDs(at the entrance), and food (green LEDs)
+	
+	if next(food) ~= nil then	-- food not empty
+		table.sort(food, function(a,b) return a.distance < b.distance end) -- sort food in increasing order
+		if math.abs(food[1].angle) > 0.0872 then	-- food angle out of threshold
+			if food[1].angle > 0 then --positive angle (food on left)
+				rotation_speed = (food[1].angle * robot.wheels.axis_length) / 2.0	-- calculate rotatoon speed
+				robot.wheels.set_velocity(-rotation_speed, rotation_speed)	-- left rotation (half on left and the remaining half on the right wheel in opposite directions)
+			else	-- negative angle (food on right)
+				rotation_speed = (math.abs(food[1].angle) * robot.wheels.axis_length) / 2.0	-- calculate rotatoon speed
+				robot.wheels.set_velocity(rotation_speed, -rotation_speed)	-- right rotation (half on left and the remaining half on the right wheel in opposite directions)
+			end
+		else	-- food angle within threshold
+			if food[1].distance <= 40 then -- food d	istance within threshold
+				is_room_sensed = false
+				is_at_entrance = false -- reset falg is_robot_at_entrance 
+				is_entered_room = true	-- the robot has moved to the desired room (site)
+				current_position = opinion -- set current position to the entered room
 				robot.wheels.set_velocity(SPEED, SPEED)	-- go straight
 			else	-- food d	istance not in threshold
 				robot.wheels.set_velocity(SPEED, SPEED)	-- go straight
@@ -313,7 +334,8 @@ function init()
 	v_L = 0	-- light sensor value
 	v	= 0	-- average of metrics
 
-	max_walk_steps = nil
+	max_walk_steps = nil	-- The total number of steps robot can take when entered into desired state	
+	rand_walk_steps = nil	-- Random number of steps before changing the direction
 
 	-- enable omnidirectional camera to detect resources
 	robot.colored_blob_omnidirectional_camera.enable()
@@ -361,7 +383,9 @@ function objectType(object)
 end
 
 
--- ********
+--[[***function processState(curr_state)***
+Process the current state by using the flags is_obstacle_sensed, is_room_sensed, is_at_entrance, is_entered_room
+]]
 function processState(curr_state)
 	if is_obstacle_sensed then	-- collision detected
 		--log(robot.id..": avoid collision")
@@ -399,7 +423,9 @@ function randomOpinion()
 end
 
 
---
+--[[***function randomOpinion()***
+Randomly change the direction of robot
+]]
 function randomWalk()
 	if rand_walk_steps == nil then
 		rand_walk_steps = robot.random.uniform_int(MAX_RAND_WALK_STEPS + 1)
@@ -410,22 +436,6 @@ function randomWalk()
 	elseif rand_walk_steps >0 then
 		rand_walk_steps = rand_walk_steps - 1
 		robot.wheels.set_velocity(SPEED, SPEED)
-	end
-end
-
-
---[[***function eqOpinion()***
-Equally distribute an opinion of available rooms.
-Update global parameter opinion on selection.
-]]
-function eqOpinion()
-	local id = string.sub(robot.id, 4)
-	if robot.motor_ground then
-		opinion = math.fmod(id - 1, 4)
-	end
-
-	if robot.light then
-		opinion = 3 - math.fmod(id - 1, 4)
 	end
 end
 
