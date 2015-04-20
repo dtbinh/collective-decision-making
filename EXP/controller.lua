@@ -92,7 +92,7 @@ function detectCollision()
 	local value = -1	-- highest value found so far
 	local index = -1	-- index of the highest value
 
-	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
+	local leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 
 	-- If robot in the desired room, do not allow it to go out of room
 	if is_entered_room then	-- if robot within the desired room
@@ -259,7 +259,7 @@ function getIntoRoom()
 	local rotation_speed = 0	-- wheels rotation speed
 	is_room_sensed = false	-- reset is_room_sensed flag
 
-	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
+	local leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 	
 	if next(food) ~= nil then	-- food not empty
 		table.sort(food, function(a,b) return a.distance < b.distance end) -- sort food in increasing order
@@ -422,7 +422,7 @@ Randomly choose an opinion of available rooms.
 Update global parameter opinion on selection.
 ]]
 function randomOpinion()
-	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
+	local leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 
 	if next(leds) ~= nil then	-- LEDs not empty
 		opinion = leds[robot.random.uniform_int(1, #leds + 1)].object_type	-- randomly choose an LED
@@ -461,7 +461,7 @@ Sense the room of opinion.
 Update glibal parameters is_room_sensed, room_angle, room_distance upon sensing the LED (opinion).
 ]]
 function senseRoom()
-	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
+	local leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 	room_angle = nil	-- init room angle
 	room_distance = nil	-- init room distance
 	if next(leds) ~= nil then	-- if LEDs not empty
@@ -482,7 +482,7 @@ end
 Separate LEDs(at the entrance), and food (green LEDs).
 ]]
 function sepLedsAndFood()
-	objects = table.copy(robot.colored_blob_omnidirectional_camera)	-- copy objects found using omnidirectional camera
+	local objects = table.copy(robot.colored_blob_omnidirectional_camera)	-- copy objects found using omnidirectional camera
 	
 	local leds = {}	-- empty table to store LEDs data
 	local food = {}	-- empty table to store food data
@@ -583,7 +583,7 @@ Save previous state to recover from collision avoidance state.
 function updateMetrics()
 	local tmp_food_count = 0 -- temporary value for food count
 
-	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
+	local leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 	
 	if next(food) ~= nil then	-- food not empty
 		for i = 1, #food do	-- for each food (green LED)
