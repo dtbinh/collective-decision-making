@@ -20,3 +20,5 @@ On terminal
 *$* cd ..	__# Change directory to EXP__
 *$* export ARGOS_PLUGIN_PATH=./build/	__# Export ARGOS_PLUGIN_PATH variable to build directory__
 *$* argos3 -c decision-making.xml	__# Run the experiment__
+
+Run *controller.lua* file from the simulator.
