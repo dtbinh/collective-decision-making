@@ -1,15 +1,15 @@
 -- Color Initialization
-GREEN = {["red"] = 0, ["green"] = 255, ["blue"] = 0}			-- food
+GREEN = {["red"] = 0, ["green"] = 255, ["blue"] = 0}		-- food
 MAGENTA = {["red"] = 255, ["green"] = 0, ["blue"] = 255}	-- room 0
-BLUE = {["red"] = 0, ["green"] = 0, ["blue"] = 255}			-- room 1
-ORANGE = {["red"] = 255, ["green"] = 140, ["blue"] = 0}		-- room 2
+BLUE = {["red"] = 0, ["green"] = 0, ["blue"] = 255}		-- room 1
+ORANGE = {["red"] = 255, ["green"] = 140, ["blue"] = 0}	-- room 2
 RED = {["red"] = 255, ["green"] = 0, ["blue"] = 0}			-- room 3
 
 -- Rooms array for debugging
 rooms = {"MAGENTA", "BLUE", "ORANGE", "RED"}
 
 -- Representation of the available resources
-NEST = -1		-- middle room
+NEST = -1	-- central room
 SITE_0 = 0	-- LED placed on room 0 entrance (MAGENTA)
 SITE_1 = 1	-- LED placed on room 1 entrance (BLUE)
 SITE_2 = 2	-- LED placed on room 2 entrance (ORANGE)
@@ -31,11 +31,11 @@ opinion = nil		-- room choice
 -- collision avoidance parameters
 resume_state = INIT			-- state to be restored when collision avoided
 is_obstacle_sensed = false	-- if obstacle found set it to true
-collision_index = nil			-- index of the proximity sensor that found the collision
+collision_index = nil		-- index of the proximity sensor that found the collision
 
 -- room sensing parameters
 is_room_sensed = false	-- when an LED (the opinion of the robot) at the entrance has to be sensed to enter or exit the room, set it to true 
-is_at_entrance = false -- robot near the LED (opinion)
+is_at_entrance = false 	-- robot near the LED (opinion)
 is_entered_room = false	-- set if robot has entered into the room for survey
 room_angle = nil			--	angle to the LED (opinion)
 room_distance = nil		-- distance to the LED (opinion)
@@ -92,7 +92,7 @@ function detectCollision()
 	local value = -1	-- highest value found so far
 	local index = -1	-- index of the highest value
 
-	leds, food = sepLedsAndFood(objects)	-- separate LEDs(at the entrance), and food (green LEDs)
+	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 
 	-- If robot in the desired room, do not allow it to go out of room
 	if is_entered_room then	-- if robot within the desired room
@@ -178,7 +178,7 @@ function executeAndFlipState(curr_state)
 			max_walk_steps = nil	-- reset max walk steps
 			local neighbors_opinion = {}	-- empty table to read neighbors opinion
 			for i = 1, #robot.range_and_bearing do -- for each robot sense
-				if robot.range_and_bearing[i].range < 215 then -- see if they are close enough. What happens if we don't put a distance cutoff here?
+				if robot.range_and_bearing[i].range < 300 then -- see if they are close enough. What happens if we don't put a distance cutoff here?
 					table.insert(neighbors_opinion, robot.range_and_bearing[i].data[1]) -- insert opinion into table
 				end
 			end
@@ -192,6 +192,13 @@ function executeAndFlipState(curr_state)
 			is_room_sensed = false	--reset is_room_sensed flag
 			is_at_entrance = false	-- reset is_at_entrance flag
 			is_entered_room = false	-- reset is_entered_room flag
+
+			-- reset metrics
+			food_count = 0	-- number of food sources found
+			v_O = 0	-- evaluation of number of food sources found (min:2, max: 12) - eval: 0.1 * food_count - 0.2
+			v_G = 0	-- ground sensor value
+			v_L = 0	-- light sensor value
+			v	= 0	-- average of metrics
 
 			current_state = SURVEY	-- switch state to SURVEY
 			resume_state = SURVEY		-- set resume_state to SURVEY to recover when collision detected
@@ -210,7 +217,7 @@ function getIntoNest()
 	local rotation_speed = 0	-- wheels rotation speed
 	is_room_sensed = false	-- reset is_room_sensed flag
 
-	leds, food = sepLedsAndFood(objects)	-- separate LEDs(at the entrance), and food (green LEDs)
+	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 	
 	if next(leds) ~= nil then	-- leds not empty
 		for i = 1, #leds do	-- for each LED
@@ -252,7 +259,7 @@ function getIntoRoom()
 	local rotation_speed = 0	-- wheels rotation speed
 	is_room_sensed = false	-- reset is_room_sensed flag
 
-	leds, food = sepLedsAndFood(objects)	-- separate LEDs(at the entrance), and food (green LEDs)
+	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 	
 	if next(food) ~= nil then	-- food not empty
 		table.sort(food, function(a,b) return a.distance < b.distance end) -- sort food in increasing order
@@ -554,8 +561,8 @@ function step()
 			end
 		end
 	else
-		log(robot.id..": state SURVEY")
-		robot.wheels.set_velocity(0,0)
+		log(robot.id..": something is wrong")
+		-- robot.wheels.set_velocity(0,0)
 	end
 end
 
@@ -576,13 +583,13 @@ Save previous state to recover from collision avoidance state.
 function updateMetrics()
 	local tmp_food_count = 0 -- temporary value for food count
 
-	leds, food = sepLedsAndFood(objects)	-- separate LEDs(at the entrance), and food (green LEDs)
+	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 	
 	if next(food) ~= nil then	-- food not empty
 		for i = 1, #food do	-- for each food (green LED)
-			--if food[i].distance <= 150 then	-- if distance within threshold
+			if food[i].distance <= 150 then	-- if distance within threshold
 				tmp_food_count = tmp_food_count + 1	-- increment food count
-			--end
+			end
 		end
 	end
 
@@ -613,5 +620,5 @@ function updateMetrics()
 		end
 	end
 
-	v = (v_G + v_L + v_O) / 2	-- calculate average value
+	v = (v_G + v_L + v_O) / 2	-- calculate average value (denominator 2 because the robot has either v_G or v_L, but not both)
 end
