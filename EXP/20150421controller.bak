@@ -9,12 +9,12 @@ RED = {["red"] = 255, ["green"] = 0, ["blue"] = 0}			-- room 3
 rooms = {"MAGENTA", "BLUE", "ORANGE", "RED"}
 
 -- Representation of the available resources
-NEST = 0	-- central room
-SITE_0 = 1	-- LED placed on room 0 entrance (MAGENTA)
-SITE_1 = 2	-- LED placed on room 1 entrance (BLUE)
-SITE_2 = 3	-- LED placed on room 2 entrance (ORANGE)
-SITE_3 = 4	-- LED placed on room 3 entrance (RED)
-FOOD = 5		-- green LEDs placed in the room
+NEST = -1	-- central room
+SITE_0 = 0	-- LED placed on room 0 entrance (MAGENTA)
+SITE_1 = 1	-- LED placed on room 1 entrance (BLUE)
+SITE_2 = 2	-- LED placed on room 2 entrance (ORANGE)
+SITE_3 = 3	-- LED placed on room 3 entrance (RED)
+FOOD = 4	-- green LEDs placed in the room
 
 -- States
 INIT = "INIT"		-- initially, when robot has no opinion, randomly select an opinion
@@ -89,8 +89,8 @@ Update global parameters is_obstacle_sensed, collision_index based on the obstac
 ]]
 function detectCollision()
    -- Initialization: index and value for proximity sensors with highest value
-	local value = -1	-- highest value found so far
-	local index = -1	-- index of the highest value
+	value = -1	-- highest value found so far
+	index = -1	-- index of the highest value
 
 	local leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 
@@ -137,11 +137,11 @@ Update global parameter opinion on selection.
 function eqOpinion()
 	id = string.sub(robot.id, 4)
 	if robot.motor_ground then
-		opinion = math.fmod(id - 1, 4) + 1
+		opinion = math.fmod(id - 1, 4)
 	end
 
 	if robot.light then
-		opinion = 4 - math.fmod(id + 1, 4)
+		opinion = 3 - math.fmod(id - 1, 4)
 	end
 end
 
@@ -149,8 +149,8 @@ end
 --[[***function executeAndFlipState()***
 Execute the current state and flip when timeout. 
 ]]
-function executeAndFlipState(curr_state)
-	if curr_state == SURVEY then	-- SURVEY state
+function executeAndFlipState()
+	if current_state == SURVEY then	-- SURVEY state
 		if max_walk_steps == nil then	-- if no max walk steps
 			max_walk_steps = robot.random.uniform_int(150, 300)	-- update max walk steps
 		
@@ -165,25 +165,27 @@ function executeAndFlipState(curr_state)
 			resume_state = WAGGLE		-- set resume_state to WAGGLE to recover when collision detected
 		
 		elseif max_walk_steps > 0 then	-- if not reached max walk steps
+			max_walk_steps = max_walk_steps - 1	-- decrement max walk steps
 			updateMetrics()	-- update metrics
 		end
 	
-	elseif curr_state == WAGGLE then	-- WAGGLE state
+	elseif current_state == WAGGLE then	-- WAGGLE state
+		robot.range_and_bearing.set_data(1,opinion)	-- broadcast opinion
 		if max_walk_steps == nil then	-- if no max walk steps
 			max_walk_steps = math.ceil(SCALE * LAM * (1 - math.exp(- LAM * v)))	-- update max walk steps
-			--log("W:"..robot.id..": o:"..rooms[opinion]..", v:"..v.."mws:"..max_walk_steps)
+			log("W:"..robot.id..": o:"..rooms[opinion+1]..", v:"..v.."mws:"..max_walk_steps)
 
 		elseif max_walk_steps <= 0 then	-- walked max steps
 			max_walk_steps = nil	-- reset max walk steps
-			local neighbors_opinion = {}	-- empty table to read neighbors opinion
+			neighbors_opinion = {}	-- empty table to read neighbors opinion
 			for i = 1, #robot.range_and_bearing do -- for each robot sense
-				if robot.range_and_bearing[i].range < 300 and robot.range_and_bearing[i].data[1] ~= 0 then -- see if they are close enough. What happens if we don't put a distance cutoff here?
+				if robot.range_and_bearing[i].range < 300 then -- see if they are close enough. What happens if we don't put a distance cutoff here?
 					table.insert(neighbors_opinion, robot.range_and_bearing[i].data[1]) -- insert opinion into table
 				end
 			end
 
 			if robot.random.uniform() > BASE_PROBABILITY then	-- probability to change the opinion
-				if next(neighbors_opinion) ~= nil then	-- neighbors not empty
+				if neighbors_opinion ~= nil then	-- neighbors not empty
 					opinion = neighbors_opinion[robot.random.uniform_int(1, #neighbors_opinion + 1)]	-- adopt opinion
 				end
 			end
@@ -203,10 +205,9 @@ function executeAndFlipState(curr_state)
 			resume_state = SURVEY		-- set resume_state to SURVEY to recover when collision detected
 
 		elseif max_walk_steps > 0 then	-- if not reached max walk steps
-			-- do nothing
+			max_walk_steps = max_walk_steps - 1	-- decrement max walk steps
 		end
-	end
-	robot.wheels.set_velocity(SPEED, SPEED)
+	end 
 end
 
 
@@ -214,7 +215,7 @@ end
 Get into the nest by moving away from the LED of opinion towards any other LED
 ]]
 function getIntoNest()
-	local rotation_speed = 0	-- wheels rotation speed
+	rotation_speed = 0	-- wheels rotation speed
 	is_room_sensed = false	-- reset is_room_sensed flag
 
 	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
@@ -256,10 +257,10 @@ end
 Get into the room by moving close to a food source (green LED)
 ]]
 function getIntoRoom()
-	local rotation_speed = 0	-- wheels rotation speed
+	rotation_speed = 0	-- wheels rotation speed
 	is_room_sensed = false	-- reset is_room_sensed flag
 
-	local leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
+	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 	
 	if next(food) ~= nil then	-- food not empty
 		table.sort(food, function(a,b) return a.distance < b.distance end) -- sort food in increasing order
@@ -293,7 +294,7 @@ Change the angle and movement of the robot towards the LED upon sensing the room
 NOTE: angle (in radians) * distance between wheels gives the direction of the object.
 ]]
 function headToLED()
-	local rotation_speed = 0
+	rotation_speed = 0
 	senseRoom()
 	if room_angle ~= nil and room_distance ~= nil then
 		if math.abs(room_angle) > 0.0872 then	-- room angle out of threshold
@@ -352,11 +353,11 @@ end
 --[[***function objectType(object)***
 	Finds the object and returns an integer value representing the object type
 	params:	object with red, green, and blue values
-	return:	1 - room 0 (magenta)
-				2 - room 1 (blue)
-				3 - room 2 (orange)
-				4 - room 3 (red)
-				5 - food (green)
+	return:	0 - room 0 (magenta)
+				1 - room 1 (blue)
+				2 - room 2 (orange)
+				3 - room 3 (red)
+				4 - food (green)
 				nil - unknown object	]]
 function objectType(object)
 	-- Food (green)
@@ -393,23 +394,20 @@ end
 --[[***function processState(curr_state)***
 Process the current state by using the flags is_obstacle_sensed, is_room_sensed, is_at_entrance, is_entered_room
 ]]
-function processState(curr_state)
-	if is_obstacle_sensed then	-- collision detected
-		--log(robot.id..": avoid collision")
-		setDataCollisionAvoid()	-- save current state to restore after avoiding collision
-	elseif is_room_sensed then
+function processState()
+	if is_room_sensed then
 		--log(robot.id..": head to led")
 		headToLED()	-- head towards the direction of the LED
 	elseif is_at_entrance then
-		if curr_state == SURVEY then
+		if current_state == SURVEY then
 			--log(robot.id..": get into room")
 			getIntoRoom()	-- randomly choose a green LED (food) and move towards it
-		elseif curr_state == WAGGLE then
+		elseif current_state == WAGGLE then
 			getIntoNest()
 		end
 	elseif is_entered_room then
 		--log(robot.id..": entered room")
-		executeAndFlipState(curr_state)
+		executeAndFlipState()
 		randomWalk()
 	else
 		senseRoom()	-- sense the room of opinion
@@ -422,7 +420,7 @@ Randomly choose an opinion of available rooms.
 Update global parameter opinion on selection.
 ]]
 function randomOpinion()
-	local leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
+	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 
 	if next(leds) ~= nil then	-- LEDs not empty
 		opinion = leds[robot.random.uniform_int(1, #leds + 1)].object_type	-- randomly choose an LED
@@ -438,7 +436,7 @@ function randomWalk()
 		rand_walk_steps = robot.random.uniform_int(MAX_RAND_WALK_STEPS + 1)
 	elseif rand_walk_steps <= 0 then
 		rand_walk_steps = nil
-		local turn_steps = robot.random.uniform_int((2 *SPEED) + 1)
+		turn_steps = robot.random.uniform_int((2 *SPEED) + 1)
 		robot.wheels.set_velocity(-turn_steps, turn_steps)
 	elseif rand_walk_steps >0 then
 		rand_walk_steps = rand_walk_steps - 1
@@ -461,7 +459,7 @@ Sense the room of opinion.
 Update glibal parameters is_room_sensed, room_angle, room_distance upon sensing the LED (opinion).
 ]]
 function senseRoom()
-	local leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
+	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 	room_angle = nil	-- init room angle
 	room_distance = nil	-- init room distance
 	if next(leds) ~= nil then	-- if LEDs not empty
@@ -486,29 +484,26 @@ function sepLedsAndFood()
 	
 	local leds = {}	-- empty table to store LEDs data
 	local food = {}	-- empty table to store food data
-	local led_count = 0	-- init LED count
-	local food_count = 0	-- init food count
 	
 	for i = 1, #objects do	-- for each object found
-		object_type = objectType(objects[i])	-- determine the object type (food or red led color)
+		local object_type = objectType(objects[i])	-- determine the object type (food or red led color)
 		if object_type then
 			if object_type == FOOD then	-- object type is food
-				food_count = food_count + 1	-- increment food count
 				local tmp = {}	-- temporary table to hold the current object data
 				tmp["object_type"] = object_type	-- store object type
 				tmp["distance"] = objects[i].distance	-- store distance to the object
 				tmp["angle"] = objects[i].angle	-- store angle to the object
-				food[food_count] = tmp	-- store temp data to master table
+				table.insert(food, tmp) 	-- store temp data to master table
 			elseif object_type >= SITE_0 and object_type <= SITE_3 then -- object type is an LED
-				led_count = led_count + 1	-- increment LED count
 				local tmp = {}	-- temporary table to hold the current object data
 				tmp["object_type"] = object_type	-- store object type
 				tmp["distance"] = objects[i].distance	-- store distance to the object
 				tmp["angle"] = objects[i].angle	-- store angle to the object
-				leds[led_count] = tmp	-- store temp data to master table
+				table.insert(leds, tmp)	-- store temp data to master table	
 			end
 		end
-	end	
+	end
+
 	return leds, food	-- return separated LED and food tables
 end
 
@@ -526,23 +521,21 @@ end
      It must contain the logic of your controller ]]
 function step()
 	detectCollision() -- If collision detected, current state is set to AVOID
-	if max_walk_steps ~= nil then	-- if max_walk_steps has a value
-		max_walk_steps = max_walk_steps - 1 -- decrement max walk steps
-	end
 
 	-- AVIOID STATE --
 	if current_state == AVOID then
 		avoidCollision()	-- move out of obstacles
+		if max_walk_steps ~= nil then	-- if max_walk_steps has a value
+			max_walk_steps = max_walk_steps - 1 -- decrement max walk steps
+		end
 
 	-- SURVEY STATE--
 	elseif current_state == SURVEY then
-		robot.range_and_bearing.set_data(1,0)	-- stop broadcasting opinion
-		processState(SURVEY)
+		processState()
 
 	-- WAGGLE DANCE STATE --
 	elseif current_state == WAGGLE then
-		robot.range_and_bearing.set_data(1,opinion)	-- broadcast opinion
-		processState(WAGGLE)
+		processState()
 	
 	--	INIT STATE--
 	elseif current_state == INIT then
@@ -553,7 +546,7 @@ function step()
 			--randomOpinion()	-- randomly choose an opinion
 			-- OR --
 			eqOpinion()
-			-- log(robot.id..": opinion: "..rooms[opinion])	-- DEBUG: robot's opinion
+			-- log(robot.id..": opinion: "..rooms[opinion+1])	-- DEBUG: robot's opinion
 			if opinion ~= nil then	-- if robot has an opinion
 				current_state = SURVEY	-- change to SURVEY state
 				resume_state = SURVEY
@@ -565,24 +558,6 @@ function step()
 	else
 		log(robot.id..": something is wrong")
 		-- robot.wheels.set_velocity(0,0)
-	end
---[[
-	if opinion ~= nil then
-		if opinion == 1 then
-			robot.leds.set_all_colors(205, 0, 205)
-		elseif opinion == 2 then
-			robot.leds.set_all_colors(85, 26, 139)
-		elseif opinion == 3 then
-			robot.leds.set_all_colors(238, 238, 0)
-		elseif opinion == 4 then
-			robot.leds.set_all_colors(128, 0, 0)
-		else
-			log(robot.id..": something wrong")
-		end
-	end
-]]
-	if opinion ~= nil then
-		log(robot.id..":"..opinion - 1)
 	end
 end
 
@@ -603,7 +578,7 @@ Save previous state to recover from collision avoidance state.
 function updateMetrics()
 	local tmp_food_count = 0 -- temporary value for food count
 
-	local leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
+	leds, food = sepLedsAndFood()	-- separate LEDs(at the entrance), and food (green LEDs)
 	
 	if next(food) ~= nil then	-- food not empty
 		for i = 1, #food do	-- for each food (green LED)
@@ -617,7 +592,7 @@ function updateMetrics()
 	if tmp_food_count > food_count then	-- update global parameter v_O whenever new food found
 		food_count = tmp_food_count	-- update food count if new food found
 		v_O = (0.1 * food_count) - 0.2	-- evaluate v_O using food count
-		--log(robot.id..": Opinion:"..rooms[opinion]..", Food eval:"..v_O)
+		--log(robot.id..": Opinion:"..rooms[opinion+1]..", Food eval:"..v_O)
 	end
 
 	-- Type G robot
@@ -626,7 +601,7 @@ function updateMetrics()
 		table.sort(ground, function(a,b) return a.value > b.value end)	-- sort ground sensor values in increasing order
 		if ground[1].value > v_G then	-- consider the maximum value of ground sensor
 			v_G = ground[1].value	-- set v_G to max ground sensor value
-			-- log(robot.id..": Opinion:"..rooms[opinion]..": Ground:"..v_G)
+			-- log(robot.id..": Opinion:"..rooms[opinion+1]..": Ground:"..v_G)
 		end
 	end
 
@@ -636,9 +611,9 @@ function updateMetrics()
 		table.sort(light, function(a,b) return a.value > b.value end)	-- sort light sensor values in increasing order
 		if light[1].value > v_L then	-- consider the maximum value of light sensor
 			v_L = light[1].value	-- set v_L to max light sensor value
-			-- log(robot.id..": Opinion:"..rooms[opinion]..": Light:"..v_L)
+			-- log(robot.id..": Opinion:"..rooms[opinion+1]..": Light:"..v_L)
 		end
 	end
 
-	v = (v_G + v_L + v_O) / 2	-- calculate average value (denominator 2 because the robot has either v_G or v_L, but not both)
+	v = (v_G + v_L + v_O) / 3	-- calculate average value (denominator 2 because the robot has either v_G or v_L, but not both)
 end
