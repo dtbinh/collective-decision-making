@@ -40,7 +40,7 @@
         <colored_blob_omnidirectional_camera implementation="rot_z_only" medium="leds" show_rays="false" />
         <differential_steering implementation="default" />
         <footbot_motor_ground implementation="rot_z_only" />
-        <footbot_proximity implementation="default" show_rays="false" />
+        <footbot_proximity implementation="default" show_rays="true" />
         <footbot_turret_encoder implementation="default" />
         <range_and_bearing implementation="medium" medium="rab" show_rays="false" />
       </sensors>
@@ -176,7 +176,7 @@
       <position method="uniform" min="-1.5,-1.5,0" max="1.5,1.5,0" />
       <orientation method="uniform" min="0,0,0" max="360,0,0" />
       <!-- You can play with the number of foot-bots changing the 'quantity' attribute -->
-      <entity quantity="15" max_trials="10" base_num="1">
+      <entity quantity="10" max_trials="10" base_num="1">
         <!-- You can play with the range of the range and bearing system changing the 'rab_range' attribute
              NOTE: here it is expressed in meters, while in the controller you'll work in cm! -->
         <foot-bot id="fbG" rab_range="1.5" omnidirectional_camera_aperture="85.2">
@@ -190,7 +190,7 @@
       <position method="uniform" min="-1.5,-1.5,0" max="1.5,1.5,0" />
       <orientation method="uniform" min="0,0,0" max="360,0,0" />
       <!-- You can play with the number of foot-bots changing the 'quantity' attribute -->
-      <entity quantity="15" max_trials="10" base_num="1">
+      <entity quantity="10" max_trials="10" base_num="1">
         <!-- You can play with the range of the range and bearing system changing the 'rab_range' attribute
              NOTE: here it is expressed in meters, while in the controller you'll work in cm! -->
         <foot-bot id="fbL" rab_range="1.5" omnidirectional_camera_aperture="85.2">
