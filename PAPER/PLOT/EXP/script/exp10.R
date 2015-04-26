@@ -11,7 +11,7 @@ par(mgp=c(2.2,0.45,0), tcl=-0.4, mar=c(3.3,3.6,1.1,1.1))
 
 barplot(A,
         names.arg=c(1, 2, 3, 4, 5),
-        xlab="Experiment Number",
+        xlab="Run Count",
         ylab="Robot Count",
         col=c("magenta", "blue", "orange", "red"),
         beside=TRUE,
